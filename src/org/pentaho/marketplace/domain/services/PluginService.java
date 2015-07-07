@@ -25,6 +25,7 @@ import org.pentaho.marketplace.domain.services.interfaces.IPluginService;
 
 import org.pentaho.marketplace.domain.services.interfaces.IRemotePluginProvider;
 import org.pentaho.platform.api.engine.IApplicationContext;
+import org.pentaho.platform.api.engine.IAuthorizationPolicy;
 import org.pentaho.platform.api.engine.IPentahoSession;
 import org.pentaho.platform.api.engine.IPluginManager;
 import org.pentaho.platform.api.engine.IPluginResourceLoader;
@@ -33,13 +34,14 @@ import org.pentaho.platform.engine.core.system.PentahoSessionHolder;
 import org.pentaho.platform.engine.core.system.PentahoSystem;
 import org.pentaho.platform.util.VersionHelper;
 import org.pentaho.platform.util.VersionInfo;
+import org.pentaho.platform.web.http.api.resources.utils.SystemUtils;
 
 import org.pentaho.telemetry.BaPluginTelemetry;
 import org.pentaho.telemetry.TelemetryHelper;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.Authentication;
-import org.springframework.security.GrantedAuthority;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.xml.sax.InputSource;
 
 import java.io.File;
@@ -162,6 +164,18 @@ public class PluginService implements IPluginService {
   }
   private IApplicationContext applicationContext;
 
+  public IAuthorizationPolicy getAuthorizationPolicy () {
+    if( this.authorizationPolicy == null ){
+      this.authorizationPolicy = PentahoSystem.get( IAuthorizationPolicy.class , getCurrentSession() );
+    }
+    return authorizationPolicy;
+  }
+
+  public void setAuthorizationPolicy ( IAuthorizationPolicy policy ) {
+    authorizationPolicy = policy;
+  }
+
+  private IAuthorizationPolicy authorizationPolicy;
 
   // TODO: see if there is a better way to encapsulate this.
   // Probably just pass in the session in the methods that require it.
@@ -183,6 +197,18 @@ public class PluginService implements IPluginService {
                         ISecurityHelper securityHelper,
                         IPluginResourceLoader resourceLoader ) {
 
+    this( metadataPluginsProvider, pluginsSerializer, versionDataFactory, domainStatusMessageFactory, securityHelper,
+        PentahoSystem.get( IAuthorizationPolicy.class, PentahoSessionHolder.getSession() ), resourceLoader );
+  }
+
+  public PluginService( IRemotePluginProvider metadataPluginsProvider,
+      MarketplaceXmlSerializer pluginsSerializer,
+      IVersionDataFactory versionDataFactory,
+      IDomainStatusMessageFactory domainStatusMessageFactory,
+      ISecurityHelper securityHelper,
+      IAuthorizationPolicy authorizationPolicy,
+      IPluginResourceLoader resourceLoader ) {
+
     //initialize dependencies
     this.versionDataFactory = versionDataFactory;
     this.domainStatusMessageFactory = domainStatusMessageFactory;
@@ -191,6 +217,7 @@ public class PluginService implements IPluginService {
     this.setXmlSerializer( serializer );
 
     this.setSecurityHelper( securityHelper );
+    this.setAuthorizationPolicy( authorizationPolicy );
     this.setPluginResourceLoader( resourceLoader );
 
     URL metadataUrl = this.getMetadataUrl( resourceLoader );
@@ -236,7 +263,7 @@ public class PluginService implements IPluginService {
 
     if ( roles == null ) {
       // If it's true, we'll just check if the user is admin
-      return this.getSecurityHelper().isPentahoAdministrator( this.getCurrentSession() );
+      return SystemUtils.canAdminister( getAuthorizationPolicy() );
     }
 
     String[] roleArr = roles.split( "," ); //$NON-NLS-1$

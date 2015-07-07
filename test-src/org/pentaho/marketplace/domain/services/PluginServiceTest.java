@@ -40,16 +40,19 @@ import org.pentaho.marketplace.domain.services.interfaces.IPluginProvider;
 import org.pentaho.marketplace.domain.services.interfaces.IRemotePluginProvider;
 
 import org.pentaho.platform.api.engine.IApplicationContext;
+import org.pentaho.platform.api.engine.IAuthorizationPolicy;
 import org.pentaho.platform.api.engine.IPentahoSession;
 import org.pentaho.platform.api.engine.IPluginResourceLoader;
 import org.pentaho.platform.api.engine.ISecurityHelper;
+import org.pentaho.platform.security.policy.rolebased.actions.AdministerSecurityAction;
 
-import org.springframework.security.Authentication;
-import org.springframework.security.GrantedAuthority;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 
 public class PluginServiceTest {
@@ -82,9 +85,10 @@ public class PluginServiceTest {
     IRemotePluginProvider pluginProvider = mock( IRemotePluginProvider.class );
     MarketplaceXmlSerializer serializer = mock( MarketplaceXmlSerializer.class );
     ISecurityHelper securityHelper = mock( ISecurityHelper.class );
+    IAuthorizationPolicy policy = mock( IAuthorizationPolicy.class );
     IPluginResourceLoader resourceLoader = mock( IPluginResourceLoader.class );
 
-    PluginService service = new PluginService( pluginProvider, serializer, versionDataFactory, domainStatusMessageFactory, securityHelper, resourceLoader );
+    PluginService service = new PluginService( pluginProvider, serializer, versionDataFactory, domainStatusMessageFactory, securityHelper, policy, resourceLoader );
 
     IApplicationContext applicationContext = mock( IApplicationContext.class );
     final String solutionPath = this.getSolutionPath();
@@ -103,7 +107,8 @@ public class PluginServiceTest {
     GrantedAuthority userAuthority = mock( GrantedAuthority.class );
     when( userAuthority.getAuthority() ).thenReturn( role );
     Authentication userAuthentication = mock( Authentication.class );
-    when( userAuthentication.getAuthorities() ).thenReturn( new GrantedAuthority[] { userAuthority } );
+    when( userAuthentication.getAuthorities() )
+        .thenReturn( ( java.util.Collection )Arrays.asList( new GrantedAuthority[] { userAuthority } ) );
     when( userAuthentication.getName() ).thenReturn( userName );
 
     return  userAuthentication;
@@ -143,8 +148,8 @@ public class PluginServiceTest {
     when( resourceLoader.getPluginSetting( PluginService.class, SETTINGS_ROLES ) ).thenReturn( null );
 
     // setup security helper for non admin user
-    ISecurityHelper securityHelper = service.getSecurityHelper();
-    when( securityHelper.isPentahoAdministrator( Mockito.any( IPentahoSession.class ) ) ).thenReturn( false );
+    IAuthorizationPolicy policy = service.getAuthorizationPolicy();
+    when( policy.isAllowed( AdministerSecurityAction.NAME ) ).thenReturn( false );
 
     // act
     IDomainStatusMessage result = service.installPlugin( "doesNotMatter", "doesNotMatter" );
@@ -167,8 +172,8 @@ public class PluginServiceTest {
     when( resourceLoader.getPluginSetting( PluginService.class, SETTINGS_ROLES ) ).thenReturn( null );
 
     // setup security helper for non admin user
-    ISecurityHelper securityHelper = service.getSecurityHelper();
-    when( securityHelper.isPentahoAdministrator( Mockito.any( IPentahoSession.class ) ) ).thenReturn( false );
+    IAuthorizationPolicy policy = service.getAuthorizationPolicy();
+    when( policy.isAllowed( AdministerSecurityAction.NAME ) ).thenReturn( false );
 
     // act
     IDomainStatusMessage result = service.uninstallPlugin( "doesNotMatter" );
